@@ -276,6 +276,12 @@
     if (d.auto        != null) document.getElementById('toggle-auto').checked   = d.auto;
     if (d.workUsedMins  != null) workUsedSecs  = d.workUsedMins  * 60;
     if (d.breakUsedMins != null) breakUsedSecs = d.breakUsedMins * 60;
+    if (d.pomodoros != null) pomodorosToday = d.pomodoros;
+    if (d.focusMins != null) focusSecs = d.focusMins * 60;
+    // Adopt the remote budget day; for legacy data without it, treat the
+    // current usage as belonging to today (no reset).
+    if (d.budgetDay != null) budgetDay = d.budgetDay;
+    else if (budgetDay === null) budgetDay = todayStr();
 
     window._applyingRemote = true;
     applySettings();
@@ -311,6 +317,9 @@
 
     updateDisplay();
     window._applyingRemote = false;
+
+    // Now that budgetDay is known, reset if the day has rolled over.
+    checkDailyReset();
   }, function() {
     syncDot.className = 'sync-dot err';
   });
@@ -321,6 +330,7 @@
   var workMins = 25, breakMins = 5;
   var workBudgetTotal = 240*60, breakBudgetTotal = 60*60;
   var workUsedSecs = 0, breakUsedSecs = 0;
+  var budgetDay = null; // "YYYY-MM-DD" the current usage belongs to
   var isWork = true, running = false;
   var secsLeft = workMins * 60;
   var interval = null;
@@ -344,6 +354,9 @@
       auto:         document.getElementById('toggle-auto').checked,
       workUsedMins: Math.round(workUsedSecs / 60),
       breakUsedMins:Math.round(breakUsedSecs / 60),
+      pomodoros:    pomodorosToday,
+      focusMins:    Math.round(focusSecs / 60),
+      budgetDay:    budgetDay || todayStr(),
     });
   }
 
@@ -548,6 +561,30 @@
     pushTimerState();
   }
 
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0');
+  }
+
+  // Reset budgets when the day rolls over. Only fires once budgetDay is known
+  // (set from Firestore or adopted on first load) so we never wipe accumulated
+  // time before the first snapshot arrives.
+  function checkDailyReset() {
+    if (budgetDay === null) return;
+    var today = todayStr();
+    if (budgetDay !== today) {
+      budgetDay = today;
+      workUsedSecs = 0;
+      breakUsedSecs = 0;
+      pomodorosToday = 0;
+      focusSecs = 0;
+      updateDisplay();
+      pushTimerState();
+    }
+  }
+
   function saveEdit(type) {
     var input = document.getElementById(type + '-edit-input');
     var val   = Math.max(0, parseInt(input.value) || 0) * 60;
@@ -600,6 +637,8 @@
   loadSettings();
   applySettings();
   updateDisplay();
+  // Catch midnight rollover while the tab stays open.
+  setInterval(checkDailyReset, 60000);
 </script>
 </body>
 </html>
