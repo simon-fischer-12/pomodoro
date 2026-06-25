@@ -1,0 +1,14 @@
+﻿mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/build/
+mobile/.gradle/
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/*.iml
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db

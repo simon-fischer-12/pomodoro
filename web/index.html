@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pomodoro Timer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    .container { width: 100%; max-width: 480px; }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .badge { font-size: 12px; padding: 3px 10px; border-radius: 8px; font-weight: 500; }
+    .badge-work  { background: #dbeafe; color: #1d4ed8; }
+    .badge-break { background: #dcfce7; color: #15803d; }
+    .badge-warn  { background: #fef3c7; color: #92400e; }
+
+    .timer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+    .auto-row  { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #666; }
+
+    .task-name {
+      font-size: 40px; font-weight: 500; text-align: center;
+      line-height: 1.1; margin-bottom: 0.25rem;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      display: none;
+    }
+
+    .timer-display {
+      font-size: 72px; font-weight: 500; letter-spacing: -2px;
+      text-align: center; line-height: 1; margin: 0.5rem 0;
+    }
+
+    .dots { display: flex; justify-content: center; gap: 8px; margin: 0.4rem 0; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #ccc; background: transparent; transition: background 0.3s; }
+    .dot.done { background: #3b82f6; border-color: #3b82f6; }
+
+    .phase-switch { display: flex; justify-content: center; gap: 6px; margin: 0.75rem 0 0.25rem; }
+    .phase-btn {
+      padding: 5px 20px; font-size: 13px; font-weight: 500;
+      border: 1px solid #d1d5db; border-radius: 20px;
+      background: #f3f4f6; color: #666; cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .phase-btn:hover { background: #e5e7eb; color: #1a1a1a; }
+    .phase-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+    .controls { display: flex; justify-content: center; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
+
+    button {
+      padding: 8px 20px; font-size: 14px; font-weight: 500;
+      border: 1px solid #d1d5db; border-radius: 10px;
+      background: #fff; color: #1a1a1a; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    button:hover { background: #f3f4f6; border-color: #9ca3af; }
+    button:active { background: #e5e7eb; }
+
+    .budget-section { padding: 12px 0; border-top: 1px solid #f0f0f0; }
+    .budget-section:first-child { border-top: none; padding-top: 0; }
+    .budget-section:last-child { padding-bottom: 0; }
+    .budget-title { font-size: 13px; color: #666; margin-bottom: 6px; }
+    .budget-row { display: flex; align-items: center; gap: 8px; }
+    .budget-val { font-size: 20px; font-weight: 500; }
+    .bar-wrap { background: #f0f0f0; border-radius: 6px; height: 8px; overflow: hidden; margin-top: 6px; }
+    .bar-fill { height: 100%; border-radius: 6px; transition: width 0.5s, background 0.5s; }
+    .budget-info { font-size: 12px; color: #888; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+    .edit-btn { background: none; border: none; padding: 0; cursor: pointer; color: #aaa; font-size: 13px; line-height: 1; }
+    .edit-btn:hover { color: #555; background: none; border: none; }
+    .edit-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .edit-row input { width: 80px; padding: 4px 8px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .edit-row button { padding: 4px 12px; font-size: 12px; }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
+    .stat-card { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 12px; padding: 12px; text-align: center; }
+    .stat-val { font-size: 22px; font-weight: 500; }
+    .stat-lbl { font-size: 12px; color: #888; margin-top: 2px; }
+
+    .settings-title { font-size: 14px; font-weight: 500; margin-bottom: 12px; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .settings-grid label { font-size: 13px; color: #666; display: block; margin-bottom: 4px; }
+    input[type="number"], input[type="text"] {
+      width: 100%; padding: 7px 10px; font-size: 14px;
+      border: 1px solid #d1d5db; border-radius: 8px;
+      background: #fafafa; color: #1a1a1a; outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus { border-color: #3b82f6; background: #fff; }
+
+    .toggle-wrap { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track { position: absolute; inset: 0; border-radius: 11px; background: #d1d5db; cursor: pointer; transition: background 0.2s; }
+    .toggle-wrap input:checked + .toggle-track { background: #1D9E75; }
+    .toggle-track::after { content:''; position:absolute; width:16px; height:16px; border-radius:50%; background:#fff; top:3px; left:3px; transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+    .toggle-wrap input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    .flash { animation: flashAnim 0.6s ease; }
+    @keyframes flashAnim { 0%,100%{opacity:1} 50%{opacity:0.15} }
+
+    .sync-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #d1d5db; display: inline-block; margin-left: 6px;
+      transition: background 0.3s;
+    }
+    .sync-dot.ok  { background: #1D9E75; }
+    .sync-dot.err { background: #ef4444; }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <div class="card">
+    <div class="timer-top">
+      <span id="phase-badge" class="badge badge-work">Praca</span>
+      <div class="auto-row">
+        <span>auto</span>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="toggle-auto" checked>
+          <div class="toggle-track"></div>
+        </label>
+        <span title="Firebase sync status"><span id="sync-dot" class="sync-dot"></span></span>
+      </div>
+    </div>
+    <div id="task-name-display" class="task-name"></div>
+    <div id="timer-display" class="timer-display">25:00</div>
+    <div id="pom-dots" class="dots"></div>
+    <div class="phase-switch">
+      <button id="btn-phase-work"  class="phase-btn active" onclick="switchPhase('work')">Praca</button>
+      <button id="btn-phase-break" class="phase-btn"        onclick="switchPhase('break')">Przerwa</button>
+    </div>
+    <div class="controls">
+      <button id="btn-start" onclick="startStop()">▶ Start</button>
+      <button onclick="resetTimer()">↺ Reset</button>
+    </div>
+    <div style="margin-top:0.75rem;">
+      <input type="text" id="set-task" placeholder="Bieżące zadanie…" oninput="updateTask()" style="width:100%;">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="budget-section" style="border-top:none;padding-top:0;">
+      <div class="budget-title">💼 Budżet pracy</div>
+      <div class="budget-row">
+        <span class="budget-val" id="work-remaining">240 min</span>
+        <span id="work-badge" class="badge badge-work">pozostało</span>
+      </div>
+      <div class="bar-wrap"><div class="bar-fill" id="work-bar" style="width:100%;background:#3b82f6;"></div></div>
+      <div class="budget-info">
+        <span id="work-used-info">Przepracowano: 0 min</span>
+        <button class="edit-btn" onclick="toggleEdit('work')" title="Edytuj">✏️</button>
+      </div>
+      <div class="edit-row" id="work-edit-row" style="display:none;">
+        <input type="number" id="work-edit-input" min="0" placeholder="min">
+        <button onclick="saveEdit('work')">Zapisz</button>
+        <button onclick="toggleEdit('work')">Anuluj</button>
+      </div>
+    </div>
+    <div class="budget-section">
+      <div class="budget-title">☕ Budżet przerw</div>
+      <div class="budget-row">
+        <span class="budget-val" id="break-remaining">60 min</span>
+        <span id="break-badge" class="badge badge-break">pozostało</span>
+      </div>
+      <div class="bar-wrap"><div class="bar-fill" id="break-bar" style="width:100%;background:#1D9E75;"></div></div>
+      <div class="budget-info">
+        <span id="break-used-info">Wykorzystano: 0 min</span>
+        <button class="edit-btn" onclick="toggleEdit('break')" title="Edytuj">✏️</button>
+      </div>
+      <div class="edit-row" id="break-edit-row" style="display:none;">
+        <input type="number" id="break-edit-input" min="0" placeholder="min">
+        <button onclick="saveEdit('break')">Zapisz</button>
+        <button onclick="toggleEdit('break')">Anuluj</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val" id="stat-pomodoros">0</div><div class="stat-lbl">pomodoros</div></div>
+    <div class="stat-card"><div class="stat-val" id="stat-focus">0 min</div><div class="stat-lbl">skupienie dziś</div></div>
+    <div class="stat-card"><div class="stat-val" id="stat-streak">0</div><div class="stat-lbl">seria</div></div>
+  </div>
+
+  <div class="card">
+    <div class="settings-title">Ustawienia</div>
+    <div class="settings-grid">
+      <div>
+        <label>Czas pracy (min)</label>
+        <input type="number" id="set-work" value="25" min="1" max="120" onchange="applySettings()">
+      </div>
+      <div>
+        <label>Czas przerwy (min)</label>
+        <input type="number" id="set-break" value="5" min="1" max="60" onchange="applySettings()">
+      </div>
+      <div>
+        <label>Budżet pracy (min)</label>
+        <input type="number" id="set-work-budget" value="240" min="0" max="960" onchange="applySettings()">
+      </div>
+      <div>
+        <label>Budżet przerw (min)</label>
+        <input type="number" id="set-budget" value="60" min="0" max="480" onchange="applySettings()">
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDB-YDj3evb5laedtfo6BnCukDOfuLsvdI",
+    authDomain:        "pomodoro-d9a43.firebaseapp.com",
+    projectId:         "pomodoro-d9a43",
+    storageBucket:     "pomodoro-d9a43.firebasestorage.app",
+    messagingSenderId: "341280278703",
+    appId:             "1:341280278703:web:bcd3dac4f8bd7d05f7ac5a",
+  };
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+  const REF = doc(db, 'pomodoro', 'timer');
+
+  var syncDot = document.getElementById('sync-dot');
+  var syncOk  = false;
+
+  // expose to global scope so timer functions can call it
+  window._fbSetTimer = function(data) {
+    setDoc(REF, data, { merge: true })
+      .then(function() { syncDot.className = 'sync-dot ok'; })
+      .catch(function() { syncDot.className = 'sync-dot err'; });
+  };
+
+  // listen for ALL changes from Firestore and apply full state
+  onSnapshot(REF, function(snap) {
+    if (!snap.exists()) return;
+    syncDot.className = 'sync-dot ok';
+    var d = snap.data();
+
+    // ignore snapshots triggered by our own recent write (2s window)
+    if (window._lastLocalWrite && Date.now() - window._lastLocalWrite < 2000) return;
+
+    // apply settings
+    if (d.workMins   != null) document.getElementById('set-work').value        = d.workMins;
+    if (d.breakMins  != null) document.getElementById('set-break').value       = d.breakMins;
+    if (d.workBudget  != null) document.getElementById('set-work-budget').value = d.workBudget;
+    if (d.breakBudget != null) document.getElementById('set-budget').value      = d.breakBudget;
+    if (d.auto        != null) document.getElementById('toggle-auto').checked   = d.auto;
+    if (d.workUsedMins  != null) workUsedSecs  = d.workUsedMins  * 60;
+    if (d.breakUsedMins != null) breakUsedSecs = d.breakUsedMins * 60;
+
+    window._applyingRemote = true;
+    applySettings();
+
+    // apply timer state
+    var remoteRunning = d.running === true;
+    var remotePhase   = d.phase || 'work';
+    var remoteEndsAt  = d.endsAt;
+
+    isWork = remotePhase === 'work';
+    updatePhaseButtons();
+
+    if (remoteRunning && remoteEndsAt) {
+      var remSecs = Math.max(0, Math.round((remoteEndsAt - Date.now()) / 1000));
+      secsLeft = remSecs;
+      if (!running) {
+        running = true;
+        tickStart  = Date.now();
+        secsAtStart = secsLeft;
+        interval = setInterval(tick, 500);
+        document.getElementById('btn-start').textContent = '⏸ Pauza';
+      }
+    } else {
+      if (running) {
+        running = false;
+        clearInterval(interval);
+        interval = null;
+        document.getElementById('btn-start').textContent = '▶ Start';
+      }
+      if (d.secsLeft != null) secsLeft = d.secsLeft;
+      else secsLeft = isWork ? workMins * 60 : breakMins * 60;
+    }
+
+    updateDisplay();
+    window._applyingRemote = false;
+  }, function() {
+    syncDot.className = 'sync-dot err';
+  });
+</script>
+
+<script>
+  // --- State ---
+  var workMins = 25, breakMins = 5;
+  var workBudgetTotal = 240*60, breakBudgetTotal = 60*60;
+  var workUsedSecs = 0, breakUsedSecs = 0;
+  var isWork = true, running = false;
+  var secsLeft = workMins * 60;
+  var interval = null;
+  var pomodorosToday = 0, focusSecs = 0, streak = 0;
+  var lastPomodoro = null;
+  var tickStart = null, secsAtStart = 0;
+
+  function pushTimerState() {
+    if (typeof window._fbSetTimer !== 'function') return;
+    if (window._applyingRemote) return;
+    window._lastLocalWrite = Date.now();
+    window._fbSetTimer({
+      running:     running,
+      phase:       isWork ? 'work' : 'break',
+      endsAt:      running ? Date.now() + secsLeft * 1000 : null,
+      secsLeft:    secsLeft,
+      workMins:    workMins,
+      breakMins:   breakMins,
+      workBudget:   Math.round(workBudgetTotal / 60),
+      breakBudget:  Math.round(breakBudgetTotal / 60),
+      auto:         document.getElementById('toggle-auto').checked,
+      workUsedMins: Math.round(workUsedSecs / 60),
+      breakUsedMins:Math.round(breakUsedSecs / 60),
+    });
+  }
+
+  // --- Phase switch ---
+  function switchPhase(phase) {
+    running = false;
+    clearInterval(interval);
+    interval = null;
+    tickStart = null;
+    secsAtStart = 0;
+    document.getElementById('btn-start').textContent = '▶ Start';
+    isWork = (phase === 'work');
+    secsLeft = isWork ? workMins * 60 : breakMins * 60;
+    updatePhaseButtons();
+    updateDisplay();
+    pushTimerState();
+  }
+
+  function updatePhaseButtons() {
+    document.getElementById('btn-phase-work').classList.toggle('active', isWork);
+    document.getElementById('btn-phase-break').classList.toggle('active', !isWork);
+  }
+
+  // --- Timer ---
+  function fmtTime(s) {
+    return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+  }
+
+  function tick() {
+    if (!running) return;
+    var now = Date.now();
+    var elapsed = Math.floor((now - tickStart) / 1000);
+    var newSecsLeft = Math.max(0, secsAtStart - elapsed);
+    var diff = secsLeft - newSecsLeft;
+    if (diff > 0) {
+      if (isWork) { focusSecs += diff; workUsedSecs += diff; }
+      secsLeft = newSecsLeft;
+      updateDisplay();
+    }
+    if (secsLeft <= 0) phaseEnd();
+  }
+
+  function startStop() {
+    running = !running;
+    var btn = document.getElementById('btn-start');
+    if (running) {
+      tickStart = Date.now();
+      secsAtStart = secsLeft;
+      interval = setInterval(tick, 500);
+      btn.textContent = '⏸ Pauza';
+    } else {
+      clearInterval(interval);
+      interval = null;
+      btn.textContent = '▶ Start';
+    }
+    pushTimerState();
+  }
+
+  function resetTimer() {
+    running = false;
+    clearInterval(interval);
+    interval = null;
+    tickStart = null;
+    secsAtStart = 0;
+    isWork = true;
+    secsLeft = workMins * 60;
+    document.getElementById('btn-start').textContent = '▶ Start';
+    updatePhaseButtons();
+    updateDisplay();
+    pushTimerState();
+  }
+
+  function phaseEnd() {
+    running = false;
+    clearInterval(interval);
+    interval = null;
+    tickStart = null;
+    secsAtStart = 0;
+    flashTimer();
+    notifyDesktop(isWork ? 'Czas pracy minął! ☕' : 'Przerwa skończona! 💼');
+    // no bell here — alarm plays only on phone
+
+    if (isWork) {
+      pomodorosToday++;
+      var now = Date.now();
+      if (lastPomodoro && now - lastPomodoro < (workMins + breakMins + 5) * 60 * 1000) streak++;
+      else streak = 1;
+      lastPomodoro = now;
+      isWork = false;
+      secsLeft = breakMins * 60;
+    } else {
+      breakUsedSecs += breakMins * 60;
+      isWork = true;
+      secsLeft = workMins * 60;
+    }
+
+    updatePhaseButtons();
+    updateDisplay();
+
+    if (document.getElementById('toggle-auto').checked) {
+      tickStart = Date.now();
+      secsAtStart = secsLeft;
+      running = true;
+      interval = setInterval(tick, 500);
+      document.getElementById('btn-start').textContent = '⏸ Pauza';
+    } else {
+      document.getElementById('btn-start').textContent = '▶ Start';
+    }
+
+    pushTimerState();
+  }
+
+  function flashTimer() {
+    var el = document.getElementById('timer-display');
+    el.classList.add('flash');
+    setTimeout(function(){ el.classList.remove('flash'); }, 700);
+  }
+
+  // --- Display ---
+  function updateDisplay() {
+    document.getElementById('timer-display').textContent = fmtTime(secsLeft);
+    var badge = document.getElementById('phase-badge');
+    if (isWork) { badge.textContent = 'Praca'; badge.className = 'badge badge-work'; }
+    else        { badge.textContent = 'Przerwa'; badge.className = 'badge badge-break'; }
+    updateBudgets();
+    document.getElementById('stat-pomodoros').textContent = pomodorosToday;
+    document.getElementById('stat-focus').textContent = Math.round(focusSecs/60) + ' min';
+    document.getElementById('stat-streak').textContent = streak;
+    renderDots();
+  }
+
+  function renderDots() {
+    var d = document.getElementById('pom-dots');
+    d.innerHTML = '';
+    for (var i = 0; i < 4; i++) {
+      var dot = document.createElement('div');
+      dot.className = 'dot';
+      if (pomodorosToday > 0 && (pomodorosToday % 4 === 0 || i < pomodorosToday % 4))
+        dot.classList.add('done');
+      d.appendChild(dot);
+    }
+  }
+
+  function updateBudgets() {
+    var wRem = Math.max(0, workBudgetTotal - workUsedSecs);
+    var wPct = workBudgetTotal > 0 ? (wRem / workBudgetTotal) * 100 : 0;
+    document.getElementById('work-remaining').textContent = Math.round(wRem/60) + ' min';
+    document.getElementById('work-bar').style.width = wPct + '%';
+    document.getElementById('work-bar').style.background = wPct < 25 ? '#f59e0b' : '#3b82f6';
+    document.getElementById('work-used-info').textContent = 'Przepracowano: ' + Math.round(workUsedSecs/60) + ' min';
+    var wb = document.getElementById('work-badge');
+    if (wRem <= 0)     { wb.textContent = 'koniec!';   wb.className = 'badge badge-warn'; }
+    else if (wPct < 25){ wb.textContent = 'mało!';     wb.className = 'badge badge-warn'; }
+    else               { wb.textContent = 'pozostało'; wb.className = 'badge badge-work'; }
+
+    var bRem = Math.max(0, breakBudgetTotal - breakUsedSecs);
+    var bPct = breakBudgetTotal > 0 ? (bRem / breakBudgetTotal) * 100 : 0;
+    document.getElementById('break-remaining').textContent = Math.round(bRem/60) + ' min';
+    document.getElementById('break-bar').style.width = bPct + '%';
+    document.getElementById('break-bar').style.background = bPct < 25 ? '#f59e0b' : '#1D9E75';
+    document.getElementById('break-used-info').textContent = 'Wykorzystano: ' + Math.round(breakUsedSecs/60) + ' min';
+    var bb = document.getElementById('break-badge');
+    if (bRem <= 0)     { bb.textContent = 'koniec!';   bb.className = 'badge badge-warn'; }
+    else if (bPct < 25){ bb.textContent = 'mało!';     bb.className = 'badge badge-warn'; }
+    else               { bb.textContent = 'pozostało'; bb.className = 'badge badge-break'; }
+  }
+
+  // --- Settings ---
+  function applySettings() {
+    workMins        = parseInt(document.getElementById('set-work').value) || 25;
+    breakMins       = parseInt(document.getElementById('set-break').value) || 5;
+    workBudgetTotal = (parseInt(document.getElementById('set-work-budget').value) || 240) * 60;
+    breakBudgetTotal= (parseInt(document.getElementById('set-budget').value) || 60) * 60;
+    if (!running) { secsLeft = isWork ? workMins * 60 : breakMins * 60; }
+    updateDisplay();
+    saveSettings();
+  }
+
+  function updateTask() {
+    var val = document.getElementById('set-task').value.trim();
+    var el  = document.getElementById('task-name-display');
+    el.textContent  = val;
+    el.style.display = val ? 'block' : 'none';
+    saveSettings();
+  }
+
+  function toggleEdit(type) {
+    var row   = document.getElementById(type + '-edit-row');
+    var input = document.getElementById(type + '-edit-input');
+    var open  = row.style.display === 'none';
+    row.style.display = open ? 'flex' : 'none';
+    if (open) {
+      input.value = Math.round((type === 'work' ? workUsedSecs : breakUsedSecs) / 60);
+      input.focus();
+    }
+  }
+
+  function saveEdit(type) {
+    var input = document.getElementById(type + '-edit-input');
+    var val   = Math.max(0, parseInt(input.value) || 0) * 60;
+    if (type === 'work') workUsedSecs  = val;
+    else                 breakUsedSecs = val;
+    document.getElementById(type + '-edit-row').style.display = 'none';
+    updateDisplay();
+  }
+
+  // --- Persistence ---
+  function saveSettings() {
+    try {
+      localStorage.setItem('pom_settings', JSON.stringify({
+        workMins:    parseInt(document.getElementById('set-work').value) || 25,
+        breakMins:   parseInt(document.getElementById('set-break').value) || 5,
+        workBudget:  parseInt(document.getElementById('set-work-budget').value) || 240,
+        breakBudget: parseInt(document.getElementById('set-budget').value) || 60,
+        auto:        document.getElementById('toggle-auto').checked,
+        task:        document.getElementById('set-task').value,
+      }));
+    } catch(e) {}
+  }
+
+  function loadSettings() {
+    try {
+      var s = JSON.parse(localStorage.getItem('pom_settings'));
+      if (!s) return;
+      document.getElementById('set-work').value        = s.workMins;
+      document.getElementById('set-break').value       = s.breakMins;
+      document.getElementById('set-work-budget').value = s.workBudget;
+      document.getElementById('set-budget').value      = s.breakBudget;
+      document.getElementById('toggle-auto').checked   = s.auto;
+      document.getElementById('set-task').value        = s.task || '';
+      updateTask();
+    } catch(e) {}
+  }
+
+  // --- Desktop notifications ---
+  function notifyDesktop(msg) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      new Notification('Pomodoro', { body: msg, icon: '' });
+    }
+  }
+
+  // --- Init ---
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+  loadSettings();
+  applySettings();
+  updateDisplay();
+</script>
+</body>
+</html>
