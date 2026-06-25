@@ -1,5 +1,4 @@
 ﻿<!DOCTYPE html>
-<!-- Pomodoro Timer -->
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
@@ -147,25 +146,25 @@
       <button id="btn-phase-break" class="phase-btn"        onclick="switchPhase('break')">Przerwa</button>
     </div>
     <div class="controls">
-      <button id="btn-start" onclick="startStop()">â–¶ Start</button>
-      <button onclick="resetTimer()">â†ş Reset</button>
+      <button id="btn-start" onclick="startStop()">▶ Start</button>
+      <button onclick="resetTimer()">↺ Reset</button>
     </div>
     <div style="margin-top:0.75rem;">
-      <input type="text" id="set-task" placeholder="BieĹĽÄ…ce zadanieâ€¦" oninput="updateTask()" style="width:100%;">
+      <input type="text" id="set-task" placeholder="Bieżące zadanie…" oninput="updateTask()" style="width:100%;">
     </div>
   </div>
 
   <div class="card">
     <div class="budget-section" style="border-top:none;padding-top:0;">
-      <div class="budget-title">đź’Ľ BudĹĽet pracy</div>
+      <div class="budget-title">💼 Budżet pracy</div>
       <div class="budget-row">
         <span class="budget-val" id="work-remaining">240 min</span>
-        <span id="work-badge" class="badge badge-work">pozostaĹ‚o</span>
+        <span id="work-badge" class="badge badge-work">pozostało</span>
       </div>
       <div class="bar-wrap"><div class="bar-fill" id="work-bar" style="width:100%;background:#3b82f6;"></div></div>
       <div class="budget-info">
         <span id="work-used-info">Przepracowano: 0 min</span>
-        <button class="edit-btn" onclick="toggleEdit('work')" title="Edytuj">âśŹď¸Ź</button>
+        <button class="edit-btn" onclick="toggleEdit('work')" title="Edytuj">✏️</button>
       </div>
       <div class="edit-row" id="work-edit-row" style="display:none;">
         <input type="number" id="work-edit-input" min="0" placeholder="min">
@@ -174,15 +173,15 @@
       </div>
     </div>
     <div class="budget-section">
-      <div class="budget-title">â• BudĹĽet przerw</div>
+      <div class="budget-title">☕ Budżet przerw</div>
       <div class="budget-row">
         <span class="budget-val" id="break-remaining">60 min</span>
-        <span id="break-badge" class="badge badge-break">pozostaĹ‚o</span>
+        <span id="break-badge" class="badge badge-break">pozostało</span>
       </div>
       <div class="bar-wrap"><div class="bar-fill" id="break-bar" style="width:100%;background:#1D9E75;"></div></div>
       <div class="budget-info">
         <span id="break-used-info">Wykorzystano: 0 min</span>
-        <button class="edit-btn" onclick="toggleEdit('break')" title="Edytuj">âśŹď¸Ź</button>
+        <button class="edit-btn" onclick="toggleEdit('break')" title="Edytuj">✏️</button>
       </div>
       <div class="edit-row" id="break-edit-row" style="display:none;">
         <input type="number" id="break-edit-input" min="0" placeholder="min">
@@ -194,7 +193,7 @@
 
   <div class="stat-grid">
     <div class="stat-card"><div class="stat-val" id="stat-pomodoros">0</div><div class="stat-lbl">pomodoros</div></div>
-    <div class="stat-card"><div class="stat-val" id="stat-focus">0 min</div><div class="stat-lbl">skupienie dziĹ›</div></div>
+    <div class="stat-card"><div class="stat-val" id="stat-focus">0 min</div><div class="stat-lbl">skupienie dziś</div></div>
     <div class="stat-card"><div class="stat-val" id="stat-streak">0</div><div class="stat-lbl">seria</div></div>
   </div>
 
@@ -210,11 +209,11 @@
         <input type="number" id="set-break" value="5" min="1" max="60" onchange="applySettings()">
       </div>
       <div>
-        <label>BudĹĽet pracy (min)</label>
+        <label>Budżet pracy (min)</label>
         <input type="number" id="set-work-budget" value="240" min="0" max="960" onchange="applySettings()">
       </div>
       <div>
-        <label>BudĹĽet przerw (min)</label>
+        <label>Budżet przerw (min)</label>
         <input type="number" id="set-budget" value="60" min="0" max="480" onchange="applySettings()">
       </div>
     </div>
@@ -227,7 +226,7 @@
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
   import { getFirestore, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-  // â”€â”€ PASTE YOUR FIREBASE CONFIG HERE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── PASTE YOUR FIREBASE CONFIG HERE ──────────────────────────────────────
   const firebaseConfig = {
     apiKey:            "AIzaSyDB-YDj3evb5laedtfo6BnCukDOfuLsvdI",
     authDomain:        "pomodoro-d9a43.firebaseapp.com",
@@ -236,7 +235,7 @@
     messagingSenderId: "341280278703",
     appId:             "1:341280278703:web:bcd3dac4f8bd7d05f7ac5a",
   };
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─────────────────────────────────────────────────────────────────────────
 
   const app = initializeApp(firebaseConfig);
   const db  = getFirestore(app);
@@ -289,14 +288,14 @@
         tickStart  = Date.now();
         secsAtStart = secsLeft;
         interval = setInterval(tick, 500);
-        document.getElementById('btn-start').textContent = 'âŹ¸ Pauza';
+        document.getElementById('btn-start').textContent = '⏸ Pauza';
       }
     } else {
       if (running) {
         running = false;
         clearInterval(interval);
         interval = null;
-        document.getElementById('btn-start').textContent = 'â–¶ Start';
+        document.getElementById('btn-start').textContent = '▶ Start';
       }
       if (d.secsLeft != null) secsLeft = d.secsLeft;
       else secsLeft = isWork ? workMins * 60 : breakMins * 60;
@@ -347,7 +346,7 @@
     interval = null;
     tickStart = null;
     secsAtStart = 0;
-    document.getElementById('btn-start').textContent = 'â–¶ Start';
+    document.getElementById('btn-start').textContent = '▶ Start';
     isWork = (phase === 'work');
     secsLeft = isWork ? workMins * 60 : breakMins * 60;
     updatePhaseButtons();
@@ -386,11 +385,11 @@
       tickStart = Date.now();
       secsAtStart = secsLeft;
       interval = setInterval(tick, 500);
-      btn.textContent = 'âŹ¸ Pauza';
+      btn.textContent = '⏸ Pauza';
     } else {
       clearInterval(interval);
       interval = null;
-      btn.textContent = 'â–¶ Start';
+      btn.textContent = '▶ Start';
     }
     pushTimerState();
   }
@@ -403,7 +402,7 @@
     secsAtStart = 0;
     isWork = true;
     secsLeft = workMins * 60;
-    document.getElementById('btn-start').textContent = 'â–¶ Start';
+    document.getElementById('btn-start').textContent = '▶ Start';
     updatePhaseButtons();
     updateDisplay();
     pushTimerState();
@@ -416,8 +415,8 @@
     tickStart = null;
     secsAtStart = 0;
     flashTimer();
-    notifyDesktop(isWork ? 'Czas pracy minÄ…Ĺ‚! â•' : 'Przerwa skoĹ„czona! đź’Ľ');
-    // no bell here â€” alarm plays only on phone
+    notifyDesktop(isWork ? 'Czas pracy minął! ☕' : 'Przerwa skończona! 💼');
+    // no bell here — alarm plays only on phone
 
     if (isWork) {
       pomodorosToday++;
@@ -441,9 +440,9 @@
       secsAtStart = secsLeft;
       running = true;
       interval = setInterval(tick, 500);
-      document.getElementById('btn-start').textContent = 'âŹ¸ Pauza';
+      document.getElementById('btn-start').textContent = '⏸ Pauza';
     } else {
-      document.getElementById('btn-start').textContent = 'â–¶ Start';
+      document.getElementById('btn-start').textContent = '▶ Start';
     }
 
     pushTimerState();
@@ -489,8 +488,8 @@
     document.getElementById('work-used-info').textContent = 'Przepracowano: ' + Math.round(workUsedSecs/60) + ' min';
     var wb = document.getElementById('work-badge');
     if (wRem <= 0)     { wb.textContent = 'koniec!';   wb.className = 'badge badge-warn'; }
-    else if (wPct < 25){ wb.textContent = 'maĹ‚o!';     wb.className = 'badge badge-warn'; }
-    else               { wb.textContent = 'pozostaĹ‚o'; wb.className = 'badge badge-work'; }
+    else if (wPct < 25){ wb.textContent = 'mało!';     wb.className = 'badge badge-warn'; }
+    else               { wb.textContent = 'pozostało'; wb.className = 'badge badge-work'; }
 
     var bRem = Math.max(0, breakBudgetTotal - breakUsedSecs);
     var bPct = breakBudgetTotal > 0 ? (bRem / breakBudgetTotal) * 100 : 0;
@@ -500,8 +499,8 @@
     document.getElementById('break-used-info').textContent = 'Wykorzystano: ' + Math.round(breakUsedSecs/60) + ' min';
     var bb = document.getElementById('break-badge');
     if (bRem <= 0)     { bb.textContent = 'koniec!';   bb.className = 'badge badge-warn'; }
-    else if (bPct < 25){ bb.textContent = 'maĹ‚o!';     bb.className = 'badge badge-warn'; }
-    else               { bb.textContent = 'pozostaĹ‚o'; bb.className = 'badge badge-break'; }
+    else if (bPct < 25){ bb.textContent = 'mało!';     bb.className = 'badge badge-warn'; }
+    else               { bb.textContent = 'pozostało'; bb.className = 'badge badge-break'; }
   }
 
   // --- Settings ---
