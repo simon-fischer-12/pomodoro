@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pomodoro Timer</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -87,6 +88,12 @@
     .edit-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
     .edit-row input { width: 80px; padding: 4px 8px; font-size: 13px; border: 1px solid #d1d5db; border-radius: 8px; }
     .edit-row button { padding: 4px 12px; font-size: 12px; }
+    .budget-reset-btn {
+      position: absolute; top: 14px; right: 14px;
+      background: none; border: 1px solid #d1d5db; border-radius: 8px;
+      padding: 3px 8px; cursor: pointer; font-size: 14px; color: #666; line-height: 1;
+    }
+    .budget-reset-btn:hover { background: #f3f4f6; color: #1a1a1a; border-color: #9ca3af; }
 
     .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
     .stat-card { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 12px; padding: 12px; text-align: center; }
@@ -154,7 +161,8 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" style="position:relative;">
+    <button class="budget-reset-btn" onclick="resetBudgets()" title="Resetuj budżety">↺</button>
     <div class="budget-section" style="border-top:none;padding-top:0;">
       <div class="budget-title">💼 Budżet pracy</div>
       <div class="budget-row">
@@ -531,6 +539,13 @@
       input.value = Math.round((type === 'work' ? workUsedSecs : breakUsedSecs) / 60);
       input.focus();
     }
+  }
+
+  function resetBudgets() {
+    workUsedSecs = 0;
+    breakUsedSecs = 0;
+    updateDisplay();
+    pushTimerState();
   }
 
   function saveEdit(type) {
