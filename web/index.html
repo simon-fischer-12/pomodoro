@@ -210,19 +210,19 @@
     <div class="settings-grid">
       <div>
         <label>Czas pracy (min)</label>
-        <input type="number" id="set-work" value="25" min="1" max="120" onchange="applySettings()">
+        <input type="number" id="set-work" value="25" min="1" max="120" onchange="applySettingsAndSync()">
       </div>
       <div>
         <label>Czas przerwy (min)</label>
-        <input type="number" id="set-break" value="5" min="1" max="60" onchange="applySettings()">
+        <input type="number" id="set-break" value="5" min="1" max="60" onchange="applySettingsAndSync()">
       </div>
       <div>
         <label>Budżet pracy (min)</label>
-        <input type="number" id="set-work-budget" value="240" min="0" max="960" onchange="applySettings()">
+        <input type="number" id="set-work-budget" value="240" min="0" max="960" onchange="applySettingsAndSync()">
       </div>
       <div>
         <label>Budżet przerw (min)</label>
-        <input type="number" id="set-budget" value="60" min="0" max="480" onchange="applySettings()">
+        <input type="number" id="set-budget" value="60" min="0" max="480" onchange="applySettingsAndSync()">
       </div>
     </div>
   </div>
@@ -533,6 +533,14 @@
     if (!running) { secsLeft = isWork ? workMins * 60 : breakMins * 60; }
     updateDisplay();
     saveSettings();
+  }
+
+  // Called from the settings inputs' onchange (fires on Enter / blur) so the
+  // new values sync to mobile. Not used at init or when applying remote state,
+  // which would otherwise push stale local state over a running timer.
+  function applySettingsAndSync() {
+    applySettings();
+    pushTimerState();
   }
 
   function updateTask() {
