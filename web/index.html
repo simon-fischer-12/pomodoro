@@ -95,6 +95,14 @@
     }
     .budget-reset-btn:hover { background: #f3f4f6; color: #1a1a1a; border-color: #9ca3af; }
 
+    .break-suggestion {
+      margin: 10px auto 0; display: inline-block;
+      background: #fef9c3; border: 1px solid #fde047; border-radius: 10px;
+      padding: 6px 12px; font-size: 13px; color: #854d0e; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .break-suggestion:hover { background: #fef08a; border-color: #facc15; }
+
     .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1rem; }
     .stat-card { background: #f9f9f9; border: 1px solid #e8e8e8; border-radius: 12px; padding: 12px; text-align: center; }
     .stat-val { font-size: 22px; font-weight: 500; }
@@ -155,6 +163,10 @@
     <div class="controls">
       <button id="btn-start" onclick="startStop()">▶ Start</button>
       <button onclick="resetTimer()">↺ Reset</button>
+    </div>
+    <div style="text-align:center;">
+      <span id="break-suggestion" class="break-suggestion" style="display:none;"
+            onclick="applyBreakSuggestion()" title="Kliknij, aby ustawić ten czas przerwy"></span>
     </div>
     <div style="margin-top:0.75rem;">
       <input type="text" id="set-task" placeholder="Bieżące zadanie…" oninput="updateTask()" style="width:100%;">
@@ -278,6 +290,8 @@
     if (d.breakUsedMins != null) breakUsedSecs = d.breakUsedMins * 60;
     if (d.pomodoros != null) pomodorosToday = d.pomodoros;
     if (d.focusMins != null) focusSecs = d.focusMins * 60;
+    if (d.workedSinceBreak != null) workedSinceBreak = d.workedSinceBreak;
+    if (d.breakSuggestion  != null) breakSuggestion  = d.breakSuggestion;
     // Adopt the remote budget day; for legacy data without it, treat the
     // current usage as belonging to today (no reset).
     if (d.budgetDay != null) budgetDay = d.budgetDay;
@@ -330,6 +344,8 @@
   var workMins = 25, breakMins = 5;
   var workBudgetTotal = 240*60, breakBudgetTotal = 60*60;
   var workUsedSecs = 0, breakUsedSecs = 0;
+  var workedSinceBreak = 0; // work seconds accumulated since the last break
+  var breakSuggestion = 0;  // suggested break length (min); 0 = nothing to show
   var budgetDay = null; // "YYYY-MM-DD" the current usage belongs to
   var isWork = true, running = false;
   var secsLeft = workMins * 60;
@@ -356,12 +372,19 @@
       breakUsedMins:Math.round(breakUsedSecs / 60),
       pomodoros:    pomodorosToday,
       focusMins:    Math.round(focusSecs / 60),
+      workedSinceBreak: workedSinceBreak,
+      breakSuggestion:  breakSuggestion,
       budgetDay:    budgetDay || todayStr(),
     });
   }
 
   // --- Phase switch ---
   function switchPhase(phase) {
+    // Leaving work for a break → compute the suggestion from worked time.
+    if (isWork && phase === 'break') {
+      breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60);
+      workedSinceBreak = 0;
+    }
     running = false;
     clearInterval(interval);
     interval = null;
@@ -392,7 +415,7 @@
     var newSecsLeft = Math.max(0, secsAtStart - elapsed);
     var diff = secsLeft - newSecsLeft;
     if (diff > 0) {
-      if (isWork) { focusSecs += diff; workUsedSecs += diff; }
+      if (isWork) { focusSecs += diff; workUsedSecs += diff; workedSinceBreak += diff; }
       secsLeft = newSecsLeft;
       updateDisplay();
     }
@@ -440,6 +463,9 @@
     // no bell here — alarm plays only on phone
 
     if (isWork) {
+      // Propose a break proportional to time worked since the last break.
+      breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60);
+      workedSinceBreak = 0;
       pomodorosToday++;
       var now = Date.now();
       if (lastPomodoro && now - lastPomodoro < (workMins + breakMins + 5) * 60 * 1000) streak++;
@@ -486,6 +512,30 @@
     document.getElementById('stat-focus').textContent = Math.round(focusSecs/60) + ' min';
     document.getElementById('stat-streak').textContent = streak;
     renderDots();
+
+    // Show the break proposal only during a break and only once work was done.
+    var sg = document.getElementById('break-suggestion');
+    if (!isWork && breakSuggestion > 0) {
+      sg.textContent = '💡 Sugerowana przerwa: ' + breakSuggestion + ' min';
+      sg.style.display = 'inline-block';
+    } else {
+      sg.style.display = 'none';
+    }
+  }
+
+  function applyBreakSuggestion() {
+    if (breakSuggestion <= 0) return;
+    breakMins = breakSuggestion;
+    document.getElementById('set-break').value = breakMins;
+    // Apply to the current break countdown (running or paused) so it takes the
+    // suggested length immediately; pushTimerState reschedules the phone alarm.
+    if (!isWork) {
+      secsLeft = breakMins * 60;
+      if (running) { tickStart = Date.now(); secsAtStart = secsLeft; }
+    }
+    saveSettings();
+    updateDisplay();
+    pushTimerState();
   }
 
   function renderDots() {
@@ -588,6 +638,8 @@
       breakUsedSecs = 0;
       pomodorosToday = 0;
       focusSecs = 0;
+      workedSinceBreak = 0;
+      breakSuggestion = 0;
       updateDisplay();
       pushTimerState();
     }
