@@ -381,9 +381,9 @@
   // --- Phase switch ---
   function switchPhase(phase) {
     // Leaving work for a break → compute the suggestion from worked time.
+    // Don't reset the accumulator; only a completed break resets it.
     if (isWork && phase === 'break') {
       breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60);
-      workedSinceBreak = 0;
     }
     running = false;
     clearInterval(interval);
@@ -464,8 +464,9 @@
 
     if (isWork) {
       // Propose a break proportional to time worked since the last break.
+      // Don't reset here — multiple work cycles without a completed break
+      // should accumulate. The reset happens when a break actually finishes.
       breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60);
-      workedSinceBreak = 0;
       pomodorosToday++;
       var now = Date.now();
       if (lastPomodoro && now - lastPomodoro < (workMins + breakMins + 5) * 60 * 1000) streak++;
@@ -475,6 +476,8 @@
       secsLeft = breakMins * 60;
     } else {
       breakUsedSecs += breakMins * 60;
+      // A break was completed → reset the worked-since-break accumulator.
+      workedSinceBreak = 0;
       isWork = true;
       secsLeft = workMins * 60;
     }
