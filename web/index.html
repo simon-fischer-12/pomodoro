@@ -469,19 +469,18 @@
     running = !running;
     var btn = document.getElementById('btn-start');
     if (running) {
-      overtime = false;
+      // Resuming past the trigger keeps overtime (no re-notify); a fresh start
+      // (secsLeft > 0) clears it so the notification fires at the trigger.
+      overtime = secsLeft <= 0;
       tickStart = Date.now();
       secsAtStart = secsLeft;
       interval = setInterval(tick, 500);
       btn.textContent = '⏸ Pauza';
     } else {
+      // Pause freezes the timer at its current value (even in overtime).
       clearInterval(interval);
       interval = null;
       btn.textContent = '▶ Start';
-      if (!auto) { // pause resets the timer to its base value in overtime mode
-        overtime = false;
-        secsLeft = isWork ? workMins * 60 : breakMins * 60;
-      }
     }
     updateDisplay();
     pushTimerState();
