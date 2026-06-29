@@ -53,17 +53,21 @@
     .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #ccc; background: transparent; transition: background 0.3s; }
     .dot.done { background: #3b82f6; border-color: #3b82f6; }
 
-    .phase-switch { display: flex; justify-content: center; gap: 6px; margin: 0.75rem 0 0.25rem; }
+    .phase-switch { display: flex; justify-content: center; margin: 0.75rem 0 0.25rem; }
     .phase-btn {
-      padding: 5px 20px; font-size: 13px; font-weight: 500;
-      border: 1px solid #d1d5db; border-radius: 20px;
-      background: #f3f4f6; color: #666; cursor: pointer;
+      padding: 8px 20px; font-size: 14px; font-weight: 500;
+      border: 1px solid #d1d5db; background: #fff; color: #1a1a1a; cursor: pointer;
+      position: relative;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
-    .phase-btn:hover { background: #e5e7eb; color: #1a1a1a; }
-    .phase-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .phase-btn:first-child { border-radius: 10px 0 0 10px; }
+    .phase-btn:last-child  { border-radius: 0 10px 10px 0; margin-left: -1px; }
+    .phase-btn:hover { background: #f3f4f6; }
+    .phase-btn.active { z-index: 1; }
+    #btn-phase-work.active  { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
+    #btn-phase-break.active { background: #dcfce7; color: #15803d; border-color: #86efac; }
 
-    .controls { display: flex; justify-content: center; gap: 10px; margin-top: 1rem; flex-wrap: wrap; }
+    .controls { display: flex; justify-content: center; gap: 10px; margin: 0.25rem 0 0.5rem; flex-wrap: wrap; }
 
     button {
       padding: 8px 20px; font-size: 14px; font-weight: 500;
@@ -153,16 +157,16 @@
         <span title="Firebase sync status"><span id="sync-dot" class="sync-dot"></span></span>
       </div>
     </div>
+    <div class="controls">
+      <button id="btn-start" onclick="startStop()">▶ Start</button>
+      <button onclick="resetTimer()">↺ Reset</button>
+    </div>
     <div id="task-name-display" class="task-name"></div>
     <div id="timer-display" class="timer-display">25:00</div>
     <div id="pom-dots" class="dots"></div>
     <div class="phase-switch">
       <button id="btn-phase-work"  class="phase-btn active" onclick="switchPhase('work')">Praca</button>
       <button id="btn-phase-break" class="phase-btn"        onclick="switchPhase('break')">Przerwa</button>
-    </div>
-    <div class="controls">
-      <button id="btn-start" onclick="startStop()">▶ Start</button>
-      <button onclick="resetTimer()">↺ Reset</button>
     </div>
     <div style="text-align:center;">
       <span id="break-suggestion" class="break-suggestion" style="display:none;"
