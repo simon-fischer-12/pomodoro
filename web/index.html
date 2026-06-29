@@ -53,8 +53,9 @@
     .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid #ccc; background: transparent; transition: background 0.3s; }
     .dot.done { background: #3b82f6; border-color: #3b82f6; }
 
-    .phase-switch { display: flex; justify-content: center; margin: 0.75rem 0 0.25rem; }
+    .phase-switch { display: flex; margin: 0.75rem auto 0.25rem; max-width: 280px; }
     .phase-btn {
+      flex: 1;
       padding: 8px 20px; font-size: 14px; font-weight: 500;
       border: 1px solid #d1d5db; background: #fff; color: #1a1a1a; cursor: pointer;
       position: relative;
@@ -67,7 +68,8 @@
     #btn-phase-work.active  { background: #dbeafe; color: #1d4ed8; border-color: #93c5fd; }
     #btn-phase-break.active { background: #dcfce7; color: #15803d; border-color: #86efac; }
 
-    .controls { display: flex; justify-content: center; gap: 10px; margin: 0.25rem 0 0.5rem; flex-wrap: wrap; }
+    .controls { display: flex; gap: 10px; margin: 0.25rem auto 0.5rem; max-width: 280px; }
+    .controls button { flex: 1; }
 
     button {
       padding: 8px 20px; font-size: 14px; font-weight: 500;
