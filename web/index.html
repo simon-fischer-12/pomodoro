@@ -308,16 +308,22 @@
     isWork = remotePhase === 'work';
     updatePhaseButtons();
 
+    var autoOn = document.getElementById('toggle-auto').checked;
     if (remoteRunning && remoteEndsAt) {
-      var remSecs = Math.max(0, Math.round((remoteEndsAt - Date.now()) / 1000));
-      secsLeft = remSecs;
-      if (!running) {
-        running = true;
-        tickStart  = Date.now();
-        secsAtStart = secsLeft;
-        interval = setInterval(tick, 500);
-        document.getElementById('btn-start').textContent = '⏸ Pauza';
+      var rem = Math.round((remoteEndsAt - Date.now()) / 1000);
+      if (!autoOn && rem <= 0) {
+        secsLeft = rem;          // overtime: work counts up / break goes negative
+        overtime = true;
+      } else {
+        secsLeft = autoOn ? Math.max(0, rem) : rem;
+        overtime = false;
       }
+      running = true;
+      tickStart  = Date.now();
+      secsAtStart = secsLeft;
+      if (interval) clearInterval(interval);
+      interval = setInterval(tick, 500);
+      document.getElementById('btn-start').textContent = '⏸ Pauza';
     } else {
       if (running) {
         running = false;
@@ -325,6 +331,7 @@
         interval = null;
         document.getElementById('btn-start').textContent = '▶ Start';
       }
+      overtime = false;
       if (d.secsLeft != null) secsLeft = d.secsLeft;
       else secsLeft = isWork ? workMins * 60 : breakMins * 60;
     }
@@ -348,6 +355,7 @@
   var breakSuggestion = 0;  // suggested break length (min); 0 = nothing to show
   var budgetDay = null; // "YYYY-MM-DD" the current usage belongs to
   var isWork = true, running = false;
+  var overtime = false; // auto OFF: past the configured time, keep running
   var secsLeft = workMins * 60;
   var interval = null;
   var pomodorosToday = 0, focusSecs = 0, streak = 0;
@@ -380,16 +388,21 @@
 
   // --- Phase switch ---
   function switchPhase(phase) {
-    // Leaving work for a break → compute the suggestion from worked time.
-    // Don't reset the accumulator; only a completed break resets it.
+    var auto = document.getElementById('toggle-auto').checked;
     if (isWork && phase === 'break') {
+      // work → break: freeze suggestion from accumulated work (incl overtime)
       breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60);
+    } else if (!isWork && phase === 'work' && !auto) {
+      // break → work in overtime mode: the break was taken, start fresh
+      workedSinceBreak = 0;
+      breakSuggestion = 0;
     }
     running = false;
     clearInterval(interval);
     interval = null;
     tickStart = null;
     secsAtStart = 0;
+    overtime = false;
     document.getElementById('btn-start').textContent = '▶ Start';
     isWork = (phase === 'work');
     secsLeft = isWork ? workMins * 60 : breakMins * 60;
@@ -408,24 +421,55 @@
     return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
   }
 
+  // Timer text honoring the mode: auto ON = remaining countdown; auto OFF =
+  // work counts up from 0, break counts down and can go negative.
+  function timerText() {
+    var auto = document.getElementById('toggle-auto').checked;
+    if (auto) return fmtTime(Math.max(0, secsLeft));
+    if (isWork) {
+      var el = workMins * 60 - secsLeft; // counts up
+      return fmtTime(el < 0 ? 0 : el);
+    }
+    return (secsLeft < 0 ? '-' : '') + fmtTime(Math.abs(secsLeft));
+  }
+
   function tick() {
     if (!running) return;
     var now = Date.now();
     var elapsed = Math.floor((now - tickStart) / 1000);
-    var newSecsLeft = Math.max(0, secsAtStart - elapsed);
+    var auto = document.getElementById('toggle-auto').checked;
+    // auto ON keeps the old behaviour (floor at 0, then advance phase).
+    // auto OFF lets the counter run past 0 (work up / break negative).
+    var raw = secsAtStart - elapsed;
+    var newSecsLeft = auto ? Math.max(0, raw) : raw;
     var diff = secsLeft - newSecsLeft;
     if (diff > 0) {
-      if (isWork) { focusSecs += diff; workUsedSecs += diff; workedSinceBreak += diff; }
+      if (isWork) {
+        focusSecs += diff; workUsedSecs += diff; workedSinceBreak += diff;
+        breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60); // live, incl overtime
+      } else if (!auto) {
+        breakUsedSecs += diff; // break overtime counts against the budget too
+      }
       secsLeft = newSecsLeft;
       updateDisplay();
     }
-    if (secsLeft <= 0) phaseEnd();
+    if (auto) {
+      if (secsLeft <= 0) phaseEnd();
+    } else if (!overtime && secsLeft <= 0) {
+      // Reached the configured time: notify once, then keep running (overtime).
+      overtime = true;
+      flashTimer();
+      notifyDesktop(isWork ? 'Czas pracy minął! ☕' : 'Przerwa skończona! 💼');
+      updateDisplay();
+    }
   }
 
   function startStop() {
+    var auto = document.getElementById('toggle-auto').checked;
     running = !running;
     var btn = document.getElementById('btn-start');
     if (running) {
+      overtime = false;
       tickStart = Date.now();
       secsAtStart = secsLeft;
       interval = setInterval(tick, 500);
@@ -434,12 +478,18 @@
       clearInterval(interval);
       interval = null;
       btn.textContent = '▶ Start';
+      if (!auto) { // pause resets the timer to its base value in overtime mode
+        overtime = false;
+        secsLeft = isWork ? workMins * 60 : breakMins * 60;
+      }
     }
+    updateDisplay();
     pushTimerState();
   }
 
   function resetTimer() {
     running = false;
+    overtime = false;
     clearInterval(interval);
     interval = null;
     tickStart = null;
@@ -506,7 +556,7 @@
 
   // --- Display ---
   function updateDisplay() {
-    document.getElementById('timer-display').textContent = fmtTime(secsLeft);
+    document.getElementById('timer-display').textContent = timerText();
     var badge = document.getElementById('phase-badge');
     if (isWork) { badge.textContent = 'Praca'; badge.className = 'badge badge-work'; }
     else        { badge.textContent = 'Przerwa'; badge.className = 'badge badge-break'; }
@@ -534,6 +584,7 @@
     // suggested length immediately; pushTimerState reschedules the phone alarm.
     if (!isWork) {
       secsLeft = breakMins * 60;
+      overtime = false;
       if (running) { tickStart = Date.now(); secsAtStart = secsLeft; }
     }
     saveSettings();
