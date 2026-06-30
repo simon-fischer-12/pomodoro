@@ -463,11 +463,15 @@
     var newSecsLeft = auto ? Math.max(0, raw) : raw;
     var diff = secsLeft - newSecsLeft;
     if (diff > 0) {
+      // Ticks run every 500ms, so a real diff is ~1s. A large diff means the
+      // tab/computer was asleep — don't credit that gap to budgets, or an
+      // overnight overtime run dumps hours at once.
+      var budgetDiff = diff > 10 ? 0 : diff;
       if (isWork) {
-        focusSecs += diff; workUsedSecs += diff; workedSinceBreak += diff;
+        focusSecs += budgetDiff; workUsedSecs += budgetDiff; workedSinceBreak += budgetDiff;
         breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60); // live, incl overtime
       } else if (!auto) {
-        breakUsedSecs += diff; // break overtime counts against the budget too
+        breakUsedSecs += budgetDiff; // break overtime counts against the budget too
       }
       secsLeft = newSecsLeft;
       updateDisplay();
@@ -713,6 +717,7 @@
       focusSecs = 0;
       workedSinceBreak = 0;
       breakSuggestion = 0;
+      usedNonce++; // make the reset win over a stale value on the other client
       updateDisplay();
       pushTimerState();
     }
