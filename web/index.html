@@ -242,6 +242,17 @@
         <label>Budżet przerw (min)</label>
         <input type="number" id="set-budget" value="60" min="0" max="480" onchange="applySettingsAndSync()">
       </div>
+      <div>
+        <label>Przypomnienie o przerwie (min)</label>
+        <input type="number" id="set-reminder" value="30" min="1" max="600" onchange="applySettingsAndSync()">
+      </div>
+      <div>
+        <label>Przypomnienia o przerwie</label>
+        <label class="toggle-wrap" style="display:inline-flex;">
+          <input type="checkbox" id="toggle-reminder" onchange="applySettingsAndSync()">
+          <div class="toggle-track"></div>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -292,6 +303,8 @@
     if (d.workBudget  != null) document.getElementById('set-work-budget').value = d.workBudget;
     if (d.breakBudget != null) document.getElementById('set-budget').value      = d.breakBudget;
     if (d.auto        != null) document.getElementById('toggle-auto').checked   = d.auto;
+    if (d.reminderMins    != null) document.getElementById('set-reminder').value    = d.reminderMins;
+    if (d.reminderEnabled != null) document.getElementById('toggle-reminder').checked = d.reminderEnabled;
     var remoteUsedNonce = d.usedNonce != null ? d.usedNonce : 0;
     if (remoteUsedNonce > usedNonce) {
       // Explicit edit/reset on the other client → adopt directly (even lower).
@@ -315,6 +328,8 @@
 
     window._applyingRemote = true;
     applySettings();
+    // Don't re-fire the reminder for a work period that already passed the interval.
+    reminderFired = reminderEnabled && workedSinceBreak >= reminderMins * 60;
 
     // apply timer state
     var remoteRunning = d.running === true;
@@ -371,6 +386,8 @@
   var breakSuggestion = 0;  // suggested break length (min); 0 = nothing to show
   var usedNonce = 0;        // bumped on explicit budget edits/resets so the
                             // other client adopts them directly (vs max-merge)
+  var reminderEnabled = false, reminderMins = 30;
+  var reminderFired = false; // fired this break-cycle; reset when a break is taken
   var budgetDay = null; // "YYYY-MM-DD" the current usage belongs to
   var isWork = true, running = false;
   var overtime = false; // auto OFF: past the configured time, keep running
@@ -401,6 +418,8 @@
       workedSinceBreak: workedSinceBreak,
       breakSuggestion:  breakSuggestion,
       usedNonce:    usedNonce,
+      reminderEnabled: reminderEnabled,
+      reminderMins:    reminderMins,
       budgetDay:    budgetDay || todayStr(),
     });
   }
@@ -415,6 +434,7 @@
       // break → work in overtime mode: the break was taken, start fresh
       workedSinceBreak = 0;
       breakSuggestion = 0;
+      reminderFired = false;
     }
     running = false;
     clearInterval(interval);
@@ -475,6 +495,12 @@
       }
       secsLeft = newSecsLeft;
       updateDisplay();
+    }
+    // Break reminder: once, after X minutes of work since the last break.
+    if (reminderEnabled && isWork && !reminderFired && workedSinceBreak >= reminderMins * 60) {
+      reminderFired = true;
+      flashTimer();
+      notifyDesktop('Czas na przerwę! 🔔');
     }
     if (auto) {
       if (secsLeft <= 0) phaseEnd();
@@ -550,6 +576,7 @@
       breakUsedSecs += breakMins * 60;
       // A break was completed → reset the worked-since-break accumulator.
       workedSinceBreak = 0;
+      reminderFired = false;
       isWork = true;
       secsLeft = workMins * 60;
     }
@@ -656,6 +683,8 @@
     breakMins       = parseInt(document.getElementById('set-break').value) || 5;
     workBudgetTotal = (parseInt(document.getElementById('set-work-budget').value) || 240) * 60;
     breakBudgetTotal= (parseInt(document.getElementById('set-budget').value) || 60) * 60;
+    reminderMins    = parseInt(document.getElementById('set-reminder').value) || 30;
+    reminderEnabled = document.getElementById('toggle-reminder').checked;
     if (!running) { secsLeft = isWork ? workMins * 60 : breakMins * 60; }
     updateDisplay();
     saveSettings();
@@ -717,6 +746,7 @@
       focusSecs = 0;
       workedSinceBreak = 0;
       breakSuggestion = 0;
+      reminderFired = false;
       usedNonce++; // make the reset win over a stale value on the other client
       updateDisplay();
       pushTimerState();
