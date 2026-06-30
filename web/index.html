@@ -177,6 +177,9 @@
     <div style="margin-top:0.75rem;">
       <input type="text" id="set-task" placeholder="Bieżące zadanie…" oninput="updateTask()" style="width:100%;">
     </div>
+    <div style="margin-top:0.5rem; text-align:center;">
+      <button id="btn-pip" onclick="openPip()" style="font-size:13px; padding:6px 14px;">⧉ Pływające okno</button>
+    </div>
   </div>
 
   <div class="card" style="position:relative;">
@@ -617,6 +620,44 @@
     document.getElementById('favicon').href = 'data:image/svg+xml,' + encodeURIComponent(svg);
   }
 
+  // --- Floating (Document Picture-in-Picture) window ---
+  async function openPip() {
+    if (!('documentPictureInPicture' in window)) {
+      alert('Pływające okno wymaga przeglądarki Chrome lub Edge (116+).');
+      return;
+    }
+    var pip = await documentPictureInPicture.requestWindow({ width: 240, height: 110 });
+    var doc = pip.document;
+    var st = doc.createElement('style');
+    st.textContent =
+      "body{margin:0;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:#fff;color:#1a1a1a;" +
+      "height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;box-sizing:border-box;}" +
+      "#pip-task{font-size:16px;font-weight:500;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      "#pip-row{display:flex;align-items:baseline;gap:10px;}" +
+      "#pip-timer{font-size:24px;font-weight:500;letter-spacing:-1px;}" +
+      "#pip-phase{font-size:13px;font-weight:500;}";
+    doc.head.appendChild(st);
+    doc.body.innerHTML = '<div id="pip-task"></div><div id="pip-row"><span id="pip-timer"></span><span id="pip-phase"></span></div>';
+    window._pip = pip;
+    pip.addEventListener('pagehide', function(){ window._pip = null; });
+    updatePipContent();
+  }
+
+  function updatePipContent() {
+    var pip = window._pip;
+    if (!pip || !pip.document) return;
+    var taskEl  = pip.document.getElementById('pip-task');
+    var timerEl = pip.document.getElementById('pip-timer');
+    var phaseEl = pip.document.getElementById('pip-phase');
+    if (!taskEl || !timerEl || !phaseEl) return;
+    var task = (document.getElementById('set-task').value || '').trim();
+    taskEl.textContent = task;
+    taskEl.style.display = task ? 'block' : 'none';
+    timerEl.textContent = timerText();
+    phaseEl.textContent = isWork ? 'Praca' : 'Przerwa';
+    phaseEl.style.color = !running ? '#9ca3af' : (isWork ? '#1d4ed8' : '#15803d');
+  }
+
   function updateDisplay() {
     document.getElementById('timer-display').textContent = timerText();
     var badge = document.getElementById('phase-badge');
@@ -624,6 +665,7 @@
     else        { badge.textContent = 'Przerwa'; badge.className = 'badge badge-break'; }
     updateBudgets();
     updateFavicon();
+    updatePipContent();
     renderDots();
 
     // Show the break proposal only during a break and only once work was done.
@@ -715,6 +757,7 @@
     el.textContent  = val;
     el.style.display = val ? 'block' : 'none';
     saveSettings();
+    updatePipContent();
   }
 
   function toggleEdit(type) {
@@ -820,6 +863,11 @@
   updateDisplay();
   // Catch midnight rollover while the tab stays open.
   setInterval(checkDailyReset, 60000);
+  // Hide the floating-window button where Document PiP isn't supported.
+  if (!('documentPictureInPicture' in window)) {
+    var pipBtn = document.getElementById('btn-pip');
+    if (pipBtn) pipBtn.style.display = 'none';
+  }
 </script>
 </body>
 </html>
