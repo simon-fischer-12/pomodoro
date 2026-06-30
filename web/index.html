@@ -217,12 +217,6 @@
     </div>
   </div>
 
-  <div class="stat-grid">
-    <div class="stat-card"><div class="stat-val" id="stat-pomodoros">0</div><div class="stat-lbl">pomodoros</div></div>
-    <div class="stat-card"><div class="stat-val" id="stat-focus">0 min</div><div class="stat-lbl">skupienie dziś</div></div>
-    <div class="stat-card"><div class="stat-val" id="stat-streak">0</div><div class="stat-lbl">seria</div></div>
-  </div>
-
   <div class="card">
     <div class="settings-title">Ustawienia</div>
     <div class="settings-grid">
@@ -610,9 +604,6 @@
     if (isWork) { badge.textContent = 'Praca'; badge.className = 'badge badge-work'; }
     else        { badge.textContent = 'Przerwa'; badge.className = 'badge badge-break'; }
     updateBudgets();
-    document.getElementById('stat-pomodoros').textContent = pomodorosToday;
-    document.getElementById('stat-focus').textContent = Math.round(focusSecs/60) + ' min';
-    document.getElementById('stat-streak').textContent = streak;
     renderDots();
 
     // Show the break proposal only during a break and only once work was done.
