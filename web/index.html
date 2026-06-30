@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pomodoro Timer</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" id="favicon">
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -598,12 +598,32 @@
   }
 
   // --- Display ---
+  var _favState = '';
+  function updateFavicon() {
+    // Stopped/paused = gray, work running = blue, break running = green.
+    var state = !running ? 'gray' : (isWork ? 'work' : 'break');
+    if (state === _favState) return;
+    _favState = state;
+    var body, hi;
+    if (state === 'gray')      { body = '#9ca3af'; hi = '#c4c9d0'; }
+    else if (state === 'work') { body = '#2563eb'; hi = '#60a5fa'; }
+    else                       { body = '#16a34a'; hi = '#4ade80'; }
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">' +
+      '<circle cx="16" cy="19" r="11" fill="' + body + '"/>' +
+      '<ellipse cx="12" cy="14" rx="3.5" ry="2.2" fill="' + hi + '" opacity="0.45"/>' +
+      '<rect x="15" y="5" width="2" height="6" rx="1" fill="#27ae60"/>' +
+      '<path d="M16 8 Q11 4 8 7 Q10 11 16 10 Z" fill="#2ecc71"/>' +
+      '<path d="M16 8 Q21 4 24 7 Q22 11 16 10 Z" fill="#2ecc71"/></svg>';
+    document.getElementById('favicon').href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
   function updateDisplay() {
     document.getElementById('timer-display').textContent = timerText();
     var badge = document.getElementById('phase-badge');
     if (isWork) { badge.textContent = 'Praca'; badge.className = 'badge badge-work'; }
     else        { badge.textContent = 'Przerwa'; badge.className = 'badge badge-break'; }
     updateBudgets();
+    updateFavicon();
     renderDots();
 
     // Show the break proposal only during a break and only once work was done.
