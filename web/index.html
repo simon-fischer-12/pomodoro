@@ -34,6 +34,9 @@
     .badge-break { background: #dcfce7; color: #15803d; }
     .badge-warn  { background: #fef3c7; color: #92400e; }
 
+    .pip-btn { background: none; border: none; padding: 0 4px; font-size: 20px; line-height: 1; color: #9ca3af; cursor: pointer; }
+    .pip-btn:hover { background: none; border: none; color: #1a1a1a; }
+
     .timer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
     .auto-row  { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #666; }
 
@@ -149,7 +152,7 @@
 
   <div class="card">
     <div class="timer-top">
-      <span id="phase-badge" class="badge badge-work">Praca</span>
+      <button id="btn-pip" onclick="openPip()" class="pip-btn" title="Pływające okno (Chrome/Edge)">⧉</button>
       <div class="auto-row">
         <span>auto</span>
         <label class="toggle-wrap">
@@ -176,9 +179,6 @@
     </div>
     <div style="margin-top:0.75rem;">
       <input type="text" id="set-task" placeholder="Bieżące zadanie…" oninput="updateTask()" style="width:100%;">
-    </div>
-    <div style="margin-top:0.5rem; text-align:center;">
-      <button id="btn-pip" onclick="openPip()" style="font-size:13px; padding:6px 14px;">⧉ Pływające okno</button>
     </div>
   </div>
 
@@ -632,10 +632,10 @@
     st.textContent =
       "body{margin:0;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:#fff;color:#1a1a1a;" +
       "height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;box-sizing:border-box;}" +
-      "#pip-task{font-size:16px;font-weight:500;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
-      "#pip-row{display:flex;align-items:baseline;gap:10px;}" +
-      "#pip-timer{font-size:24px;font-weight:500;letter-spacing:-1px;}" +
-      "#pip-phase{font-size:13px;font-weight:500;}";
+      "#pip-task{font-size:22px;font-weight:500;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      "#pip-row{display:flex;align-items:center;gap:10px;}" +
+      "#pip-timer{font-size:18px;font-weight:500;letter-spacing:-0.5px;}" +
+      "#pip-phase{font-size:13px;font-weight:500;padding:3px 12px;border-radius:8px;border:1px solid transparent;}";
     doc.head.appendChild(st);
     doc.body.innerHTML = '<div id="pip-task"></div><div id="pip-row"><span id="pip-timer"></span><span id="pip-phase"></span></div>';
     window._pip = pip;
@@ -655,14 +655,13 @@
     taskEl.style.display = task ? 'block' : 'none';
     timerEl.textContent = timerText();
     phaseEl.textContent = isWork ? 'Praca' : 'Przerwa';
-    phaseEl.style.color = !running ? '#9ca3af' : (isWork ? '#1d4ed8' : '#15803d');
+    // Match the web phase-switch buttons: work = blue, break = green.
+    if (isWork) { phaseEl.style.background = '#dbeafe'; phaseEl.style.color = '#1d4ed8'; phaseEl.style.borderColor = '#93c5fd'; }
+    else        { phaseEl.style.background = '#dcfce7'; phaseEl.style.color = '#15803d'; phaseEl.style.borderColor = '#86efac'; }
   }
 
   function updateDisplay() {
     document.getElementById('timer-display').textContent = timerText();
-    var badge = document.getElementById('phase-badge');
-    if (isWork) { badge.textContent = 'Praca'; badge.className = 'badge badge-work'; }
-    else        { badge.textContent = 'Przerwa'; badge.className = 'badge badge-break'; }
     updateBudgets();
     updateFavicon();
     updatePipContent();
