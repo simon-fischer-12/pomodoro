@@ -667,9 +667,10 @@
     updatePipContent();
     renderDots();
 
-    // Show the break proposal only during a break and only once work was done.
+    // Show the break proposal (in both work and break views) only once at
+    // least 20 min of work has accumulated since the last break.
     var sg = document.getElementById('break-suggestion');
-    if (!isWork && breakSuggestion > 0) {
+    if (workedSinceBreak >= 1200 && breakSuggestion > 0) {
       sg.textContent = '💡 Sugerowana przerwa: ' + breakSuggestion + ' min';
       sg.style.display = 'inline-block';
     } else {
