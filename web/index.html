@@ -480,10 +480,11 @@
     var newSecsLeft = auto ? Math.max(0, raw) : raw;
     var diff = secsLeft - newSecsLeft;
     if (diff > 0) {
-      // Ticks run every 500ms, so a real diff is ~1s. A large diff means the
-      // tab/computer was asleep — don't credit that gap to budgets, or an
-      // overnight overtime run dumps hours at once.
-      var budgetDiff = diff > 10 ? 0 : diff;
+      // Credit real elapsed to budgets, but cap each tick at 90s. A hidden tab
+      // is throttled to ~1 tick/min (diff ~60s) — that's real work and must
+      // count — while a device sleep produces one giant tick on wake; capping
+      // to 90s counts the former fully and blocks the latter's hours-long dump.
+      var budgetDiff = Math.min(diff, 90);
       if (isWork) {
         focusSecs += budgetDiff; workUsedSecs += budgetDiff; workedSinceBreak += budgetDiff;
         breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60); // live, incl overtime
