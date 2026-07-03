@@ -626,18 +626,25 @@
       alert('Pływające okno wymaga przeglądarki Chrome lub Edge (116+).');
       return;
     }
-    var pip = await documentPictureInPicture.requestWindow({ width: 240, height: 110 });
+    var pip = await documentPictureInPicture.requestWindow({ width: 240, height: 130 });
     var doc = pip.document;
     var st = doc.createElement('style');
     st.textContent =
       "body{margin:0;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:#fff;color:#1a1a1a;" +
-      "height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px;box-sizing:border-box;}" +
+      "height:100vh;display:flex;flex-direction:column;padding:10px;box-sizing:border-box;}" +
+      "#pip-main{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;}" +
       "#pip-task{font-size:22px;font-weight:500;text-align:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
       "#pip-row{display:flex;align-items:center;gap:10px;}" +
       "#pip-timer{font-size:18px;font-weight:500;letter-spacing:-0.5px;}" +
-      "#pip-phase{font-size:13px;font-weight:500;padding:3px 12px;border-radius:8px;border:1px solid transparent;}";
+      "#pip-phase{font-size:13px;font-weight:500;padding:3px 12px;border-radius:8px;border:1px solid transparent;}" +
+      "#pip-bars{display:flex;flex-direction:column;gap:4px;}" +
+      ".pip-bar-track{width:100%;height:6px;border-radius:3px;background:#f0f0f0;overflow:hidden;}" +
+      ".pip-bar-fill{height:100%;border-radius:3px;}";
     doc.head.appendChild(st);
-    doc.body.innerHTML = '<div id="pip-task"></div><div id="pip-row"><span id="pip-timer"></span><span id="pip-phase"></span></div>';
+    doc.body.innerHTML =
+      '<div id="pip-main"><div id="pip-task"></div><div id="pip-row"><span id="pip-timer"></span><span id="pip-phase"></span></div></div>' +
+      '<div id="pip-bars"><div class="pip-bar-track"><div id="pip-work-bar" class="pip-bar-fill"></div></div>' +
+      '<div class="pip-bar-track"><div id="pip-break-bar" class="pip-bar-fill"></div></div></div>';
     window._pip = pip;
     pip.addEventListener('pagehide', function(){ window._pip = null; });
     updatePipContent();
@@ -649,7 +656,9 @@
     var taskEl  = pip.document.getElementById('pip-task');
     var timerEl = pip.document.getElementById('pip-timer');
     var phaseEl = pip.document.getElementById('pip-phase');
-    if (!taskEl || !timerEl || !phaseEl) return;
+    var workBarEl  = pip.document.getElementById('pip-work-bar');
+    var breakBarEl = pip.document.getElementById('pip-break-bar');
+    if (!taskEl || !timerEl || !phaseEl || !workBarEl || !breakBarEl) return;
     var task = (document.getElementById('set-task').value || '').trim();
     taskEl.textContent = task;
     taskEl.style.display = task ? 'block' : 'none';
@@ -658,6 +667,14 @@
     // Match the web phase-switch buttons: work = blue, break = green.
     if (isWork) { phaseEl.style.background = '#dbeafe'; phaseEl.style.color = '#1d4ed8'; phaseEl.style.borderColor = '#93c5fd'; }
     else        { phaseEl.style.background = '#dcfce7'; phaseEl.style.color = '#15803d'; phaseEl.style.borderColor = '#86efac'; }
+
+    // Budget bars, same thresholds/colors as the main budget card.
+    var wPct = workBudgetTotal > 0 ? Math.max(0, workBudgetTotal - workUsedSecs) / workBudgetTotal * 100 : 0;
+    workBarEl.style.width = wPct + '%';
+    workBarEl.style.background = wPct < 25 ? '#f59e0b' : '#3b82f6';
+    var bPct = breakBudgetTotal > 0 ? Math.max(0, breakBudgetTotal - breakUsedSecs) / breakBudgetTotal * 100 : 0;
+    breakBarEl.style.width = bPct + '%';
+    breakBarEl.style.background = bPct < 25 ? '#f59e0b' : '#1D9E75';
   }
 
   function updateDisplay() {
