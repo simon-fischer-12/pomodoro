@@ -480,11 +480,13 @@
     var newSecsLeft = auto ? Math.max(0, raw) : raw;
     var diff = secsLeft - newSecsLeft;
     if (diff > 0) {
-      // Credit real elapsed to budgets, but cap each tick at 90s. A hidden tab
-      // is throttled to ~1 tick/min (diff ~60s) — that's real work and must
-      // count — while a device sleep produces one giant tick on wake; capping
-      // to 90s counts the former fully and blocks the latter's hours-long dump.
-      var budgetDiff = Math.min(diff, 90);
+      // diff is real elapsed since the last tick (from the wall clock), so a
+      // frozen/throttled hidden tab produces one big diff = the whole gap on the
+      // next tick / on reactivation. Credit the full gap as work UNLESS it is
+      // longer than 3h, which means the device slept / was left overnight —
+      // then don't count it. This counts real background work and blocks the
+      // overnight dump, without any per-tick undercounting.
+      var budgetDiff = diff > 10800 ? 0 : diff;
       if (isWork) {
         focusSecs += budgetDiff; workUsedSecs += budgetDiff; workedSinceBreak += budgetDiff;
         breakSuggestion = Math.round(workedSinceBreak * 0.3 / 60); // live, incl overtime
@@ -678,36 +680,11 @@
     breakBarEl.style.background = bPct < 25 ? '#f59e0b' : '#1D9E75';
   }
 
-  // Keep-alive: a backgrounded tab is frozen/throttled by the browser, which
-  // stalls the tick and undercounts budgets. A tab that is playing media is not
-  // frozen, so we loop an inaudible (zero-amplitude) audio track while a timer
-  // runs. Audio stops when the device sleeps, so the sleep cap still applies.
-  var _keepAudio = null;
-  function buildKeepAudio() {
-    var sr = 8000, n = sr; // 1s of 8-bit mono silence
-    var buf = new ArrayBuffer(44 + n), dv = new DataView(buf);
-    function ws(o, s){ for (var i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); }
-    ws(0,'RIFF'); dv.setUint32(4, 36 + n, true); ws(8,'WAVE'); ws(12,'fmt ');
-    dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,1,true);
-    dv.setUint32(24,sr,true); dv.setUint32(28,sr,true); dv.setUint16(32,1,true); dv.setUint16(34,8,true);
-    ws(36,'data'); dv.setUint32(40,n,true);
-    for (var i = 0; i < n; i++) dv.setUint8(44 + i, 128); // 128 = silence for unsigned 8-bit
-    var a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
-    a.loop = true;
-    return a;
-  }
-  function syncKeepAlive() {
-    if (!_keepAudio) _keepAudio = buildKeepAudio();
-    if (running) { _keepAudio.play().catch(function(){}); }
-    else { _keepAudio.pause(); }
-  }
-
   function updateDisplay() {
     document.getElementById('timer-display').textContent = timerText();
     updateBudgets();
     updateFavicon();
     updatePipContent();
-    syncKeepAlive();
     renderDots();
 
     // Show the break proposal (in both work and break views) only once at
@@ -906,6 +883,11 @@
   updateDisplay();
   // Catch midnight rollover while the tab stays open.
   setInterval(checkDailyReset, 60000);
+  // When the tab is reactivated after being frozen in the background, run a
+  // tick immediately so the budget catches up on the elapsed work right away.
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && running) tick();
+  });
   // Hide the floating-window button where Document PiP isn't supported.
   if (!('documentPictureInPicture' in window)) {
     var pipBtn = document.getElementById('btn-pip');
