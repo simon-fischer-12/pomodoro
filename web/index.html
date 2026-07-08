@@ -326,7 +326,7 @@
     window._applyingRemote = true;
     applySettings();
     // Don't re-fire the reminder for a work period that already passed the interval.
-    reminderFired = reminderEnabled && workedSinceBreak >= reminderMins * 60;
+    remindersFired = reminderEnabled ? Math.floor(workedSinceBreak / (reminderMins * 60)) : 0;
 
     // apply timer state
     var remoteRunning = d.running === true;
@@ -384,7 +384,7 @@
   var usedNonce = 0;        // bumped on explicit budget edits/resets so the
                             // other client adopts them directly (vs max-merge)
   var reminderEnabled = false, reminderMins = 30;
-  var reminderFired = false; // fired this break-cycle; reset when a break is taken
+  var remindersFired = 0; // how many interval reminders fired this break-cycle
   var budgetDay = null; // "YYYY-MM-DD" the current usage belongs to
   var isWork = true, running = false;
   var overtime = false; // auto OFF: past the configured time, keep running
@@ -431,7 +431,7 @@
       // break → work in overtime mode: the break was taken, start fresh
       workedSinceBreak = 0;
       breakSuggestion = 0;
-      reminderFired = false;
+      remindersFired = 0;
     }
     running = false;
     clearInterval(interval);
@@ -496,11 +496,16 @@
       secsLeft = newSecsLeft;
       updateDisplay();
     }
-    // Break reminder: once, after X minutes of work since the last break.
-    if (reminderEnabled && isWork && !reminderFired && workedSinceBreak >= reminderMins * 60) {
-      reminderFired = true;
-      flashTimer();
-      notifyDesktop('Czas na przerwę! 🔔');
+    // Break reminder: recurring, every reminderMins of work since the last
+    // break (60, 120, 180 ... min). Fires once per crossed interval; a big
+    // catch-up jump still notifies only once.
+    if (reminderEnabled && isWork && running) {
+      var due = Math.floor(workedSinceBreak / (reminderMins * 60));
+      if (due > remindersFired) {
+        remindersFired = due;
+        flashTimer();
+        notifyDesktop('Czas na przerwę! 🔔');
+      }
     }
     if (auto) {
       if (secsLeft <= 0) phaseEnd();
@@ -576,7 +581,7 @@
       breakUsedSecs += breakMins * 60;
       // A break was completed → reset the worked-since-break accumulator.
       workedSinceBreak = 0;
-      reminderFired = false;
+      remindersFired = 0;
       isWork = true;
       secsLeft = workMins * 60;
     }
@@ -820,7 +825,7 @@
       focusSecs = 0;
       workedSinceBreak = 0;
       breakSuggestion = 0;
-      reminderFired = false;
+      remindersFired = 0;
       usedNonce++; // make the reset win over a stale value on the other client
       updateDisplay();
       pushTimerState();
