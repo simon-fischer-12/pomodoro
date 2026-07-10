@@ -504,7 +504,7 @@
       if (due > remindersFired) {
         remindersFired = due;
         flashTimer();
-        notifyDesktop('Czas na przerwę! 🔔');
+        notifyDesktop('Czas na przerwę! 🔔 (praca: ' + Math.round(workedSinceBreak / 60) + ' min)', 'break-reminder');
       }
     }
     if (auto) {
@@ -872,10 +872,14 @@
   }
 
   // --- Desktop notifications ---
-  function notifyDesktop(msg) {
+  // With a tag, a repeat replaces the previous one and (renotify) re-alerts,
+  // so recurring reminders pop each time instead of silently stacking.
+  function notifyDesktop(msg, tag) {
     if (!('Notification' in window)) return;
     if (Notification.permission === 'granted') {
-      new Notification('Pomodoro', { body: msg, icon: '' });
+      var opts = { body: msg, icon: '' };
+      if (tag) { opts.tag = tag; opts.renotify = true; }
+      new Notification('Pomodoro', opts);
     }
   }
 
