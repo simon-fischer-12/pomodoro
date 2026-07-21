@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Pomodoro — the web and mobile clients share a single timer document and use
+// no authentication, so access is scoped to exactly that one document and
+// everything else in the database is denied.
+//
+// Trade-off (accepted): the Firebase config is public (it ships in the web
+// page), so anyone who finds it can read/write this one document. It holds no
+// personal data — only timer state, budgets and settings — and the project is
+// on the free Spark plan, so abuse cannot incur cost, at worst it burns the
+// daily free quota. Tighten this with Firebase Auth (restrict to a uid) if the
+// document ever starts holding anything sensitive.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /pomodoro/timer {
+      allow read, write: if true;
+    }
+
+    // Anything not matched above is denied by default.
+  }
+}
