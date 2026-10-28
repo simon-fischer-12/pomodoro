@@ -9,9 +9,11 @@
 //   200 = a TimeEntry is running; 204 = nothing running.
 // Auth: Bearer with the Toggl 2.0 personal key (toggl_sk_...).
 //
-// Latency is the poll interval (~3 min) — Toggl 2.0 offers no real-time push.
-// Interval kept under Toggl's free API limit (~30 req/h), shared with other
-// automations on the same key.
+// Latency is the poll interval (~2.5 min avg) — Toggl 2.0 offers no real-time
+// push. Cron is minute-granular, so a true 2.5 min isn't expressible; instead
+// we fire on an alternating 2-and-3-minute pattern = 24 polls/h (avg 2.5 min),
+// kept under Toggl's free API limit (~30 req/h), shared with other automations
+// on the same key (toggle-to-notion runs ~1-2 Toggl calls/day, at night).
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
@@ -29,7 +31,8 @@ const timerRef = () => admin.firestore().doc("pomodoro/timer");
 
 exports.togglPoll = onSchedule(
   {
-    schedule: "every 3 minutes",
+    // Alternating 2/3-min gaps = 24 polls/h, avg 2.5 min, max gap 3 min.
+    schedule: "0,2,5,7,10,12,15,17,20,22,25,27,30,32,35,37,40,42,45,47,50,52,55,57 * * * *",
     region: "europe-west1",
     maxInstances: 1,
     secrets: [TOGGL_FOCUS_TOKEN],
