@@ -1,45 +1,47 @@
-# Integracja Toggl → Pomodoro (webhooki + Firebase Cloud Function)
+# Integracja Toggl 2.0 → Pomodoro (polling + Firebase Cloud Function)
 
-Kierunek **B**: zdarzenia w Toggl Track (np. start/stop wpisu czasu) wyzwalają
-zmianę stanu w Pomodoro. Metoda **2**: odbiornikiem webhooków jest Firebase
-Cloud Function, która zapisuje do Firestore (`pomodoro/timer`), a web i mobile
-podchwytują zmianę przez istniejący sync.
+Kierunek **B**: aktywność w Toggl steruje stanem Pomodoro. Ponieważ **Toggl 2.0
+(Focus) nie ma webhooków**, funkcja Firebase **odpytuje** (polling) bieżący wpis
+i zapisuje do Firestore (`pomodoro/timer`), a web i mobile podchwytują zmianę.
 
 ```
-Toggl Track  --(webhook POST on event)-->  Cloud Function (HTTPS)
-                                                  |
-                                                  v
-                                      Firestore  pomodoro/timer
-                                                  |
-                                         (sync)   v
-                                            web  +  mobile
+Cloud Scheduler (co 3 min) --> Cloud Function togglPoll
+                                   | GET focus.toggl.com/.../tracking/current
+                                   v  (200 = leci, 204 = nic)
+                         Firestore  pomodoro/timer
+                                   |  (sync)
+                                   v
+                              web + mobile
 ```
 
-## Status — WDROŻONE i działa (2026-10-28)
+## Status — WDROŻONE i działa (polling, 2026-10-28)
 
-Faktyczna implementacja jest w `functions/index.js` (reszta tego dokumentu to
-pierwotny plan/referencja). Co jest na produkcji:
-
-- **Funkcja:** `togglWebhook` (Gen2, region `europe-west1`, Node 22,
-  `maxInstances: 2`). URL: `https://europe-west1-pomodoro-d9a43.cloudfunctions.net/togglWebhook`.
-- **Sekret:** `TOGGL_WEBHOOK_SECRET` w Secret Manager (HMAC), ten sam na subskrypcji.
-- **Subskrypcja Track:** `subscription_id 131101`, workspace `6711899`,
-  filtry `time_entry` × (`created`, `updated`), `validated`.
-- **Mapowanie:** Toggl start (wpis trwający: `stop=null`, `duration<0`) → Pomodoro
-  **praca**; Toggl stop (`updated` z ustawionym `stop`) → Pomodoro **przerwa**.
-  Śledzimy `togglEntryId`, żeby edycje starych wpisów nie wywoływały fałszywej przerwy.
+Implementacja: `functions/index.js`. Na produkcji:
+- **Funkcja:** `togglPoll` — scheduled (Cloud Scheduler **co 3 min**), Gen2,
+  `europe-west1`, Node 22, `maxInstances: 1`.
+- **Sekret:** `TOGGL_FOCUS_TOKEN` = klucz Toggl 2.0 `toggl_sk_` (Bearer).
+- **Endpoint:** `GET focus.toggl.com/api/organizations/6684157/workspaces/6711899/tracking/current`
+  → `200` (leci wpis; pole `type`, np. `activity`) = **praca**; `204` (nic nie leci) = **przerwa**.
+- **Mapowanie:** pojawił się trwający wpis → Pomodoro **praca**; zniknął (stop) →
+  **przerwa**. Śledzi `togglEntryId`, żeby rozpoznać zmianę.
+- **Opóźnienie:** do ~3 min (interwał pollingu) — Toggl 2.0 nie oferuje push.
 
 **Kluczowe wnioski (łatwo się potknąć):**
-- **Konto jest na Toggl 2.0 (Focus), nie Track.** Webhooki są tylko w **Track v9**
-  (`api.track.toggl.com`). Żeby aktywność z 2.0 trafiała do Track i wyzwalała
-  webhook, trzeba mieć włączony **Live Sync 2.0 → Track**.
-- **Dwa różne tokeny:** do utworzenia/zarządzania subskrypcją Track używa się
-  **tokenu Track v9** (Basic auth `token:api_token`). Nowy token `toggl_sk_`
-  (Bearer, API 2.0 `focus.toggl.com`) jest **odrzucany** przez v9.
-- **Payload webhooka ma `metadata.model`** (= `"time_entry"`), **NIE `metadata.entity`**
-  (tak nazywa się tylko pole filtra w subskrypcji). Nie dodawać z powrotem
-  warunku `if (meta.entity !== "time_entry")` — odrzuci wszystko.
+- **Toggl 2.0 (Focus) NIE MA webhooków** (sprawdzone w pełnym OpenAPI: „subscription"
+  tam = płatności Stripe; `time-entries/stream` to tylko streamowana lista, nie eventy).
+  Polling `tracking/current` to jedyna droga dla kierunku „z Toggla".
+- **Webhooki Track nie pomagają:** konto jest na 2.0, a **Live Sync 2.0→Track lustrzy
+  tylko UKOŃCZONE bloki** (po stopie), nie stan „na żywo" — Track nigdy nie dostaje
+  trwającego wpisu, więc webhook startu nie odpala. (Była wdrożona próba webhookowa,
+  subskrypcja Track `131101` — porzucona; reszta tego dokumentu to ten nieaktualny plan.)
+- **Klucz `toggl_sk_` jest JEDEN na użytkownika** (regeneracja unieważnia stary) i
+  **współdzielony z automatyzacją `toggle-to-notion`** (GitHub secret `TOGGL_TOKEN`) —
+  przy regeneracji trzeba zaktualizować oba sekrety.
+- **Limit Toggl Free ~30 zapytań/h** na ten jeden klucz — stąd polling co 3 min (~20/h).
 - **Trzymać `auto` OFF** w Pomodoro, inaczej przerwa auto-przeskoczy z powrotem na pracę.
+
+---
+_Poniżej: pierwotny plan WEBHOOKOWY (Track) — zachowany jako referencja, **nie jest używany** (Toggl 2.0 nie ma webhooków)._
 
 ## Warunki wstępne
 - Plan **Blaze** (pay-as-you-go) w Firebase — wymagany do deployu funkcji.

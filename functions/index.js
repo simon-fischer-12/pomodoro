@@ -1,106 +1,107 @@
-// Toggl Track -> Pomodoro sync (webhook receiver).
+// Toggl 2.0 (Focus) -> Pomodoro sync by POLLING.
 //
-// Mapping:
-//   Toggl time entry STARTED  -> Pomodoro starts WORK  (phase=work, running)
-//   Toggl time entry STOPPED  -> Pomodoro starts BREAK (phase=break, running)
+// Toggl 2.0 has no webhooks, so a scheduled function polls the current running
+// time entry every few minutes and drives the Firestore doc `pomodoro/timer`:
+//   Toggl timer running  -> Pomodoro WORK  (phase=work)
+//   Toggl timer stopped  -> Pomodoro BREAK (phase=break)
 //
-// Writes directly to the Firestore doc `pomodoro/timer`; the web and mobile
-// clients render/sync from there. The Admin SDK bypasses Firestore rules.
+// Endpoint: GET /organizations/{org}/workspaces/{ws}/tracking/current
+//   200 = a TimeEntry is running; 204 = nothing running.
+// Auth: Bearer with the Toggl 2.0 personal key (toggl_sk_...).
+//
+// Latency is the poll interval (~3 min) — Toggl 2.0 offers no real-time push.
+// Interval kept under Toggl's free API limit (~30 req/h), shared with other
+// automations on the same key.
 
-const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
-const crypto = require("crypto");
 
 admin.initializeApp();
 
-// Shared HMAC secret, also configured on the Toggl subscription. Set with:
-//   firebase functions:secrets:set TOGGL_WEBHOOK_SECRET
-const TOGGL_WEBHOOK_SECRET = defineSecret("TOGGL_WEBHOOK_SECRET");
+// Toggl 2.0 personal API key (toggl_sk_...). Set with:
+//   firebase functions:secrets:set TOGGL_FOCUS_TOKEN
+const TOGGL_FOCUS_TOKEN = defineSecret("TOGGL_FOCUS_TOKEN");
 
+const ORG_ID = "6684157";
+const WS_ID = "6711899";
 const timerRef = () => admin.firestore().doc("pomodoro/timer");
 
-exports.togglWebhook = onRequest(
+exports.togglPoll = onSchedule(
   {
+    schedule: "every 3 minutes",
     region: "europe-west1",
-    maxInstances: 2, // hard guardrail against a runaway loop
-    secrets: [TOGGL_WEBHOOK_SECRET],
+    maxInstances: 1,
+    secrets: [TOGGL_FOCUS_TOKEN],
   },
-  async (req, res) => {
-    const body = req.body || {};
+  async () => {
+    const url =
+      `https://focus.toggl.com/api/organizations/${ORG_ID}` +
+      `/workspaces/${WS_ID}/tracking/current`;
 
-    // 1. Validation handshake: Toggl sends this when (re)validating the
-    //    subscription; echo the code back to confirm the endpoint.
-    if (body.validation_code) {
-      return res.status(200).json({ validation_code: body.validation_code });
+    let resp;
+    try {
+      resp = await fetch(url, {
+        headers: { Authorization: `Bearer ${TOGGL_FOCUS_TOKEN.value()}` },
+      });
+    } catch (e) {
+      console.error("toggl fetch failed:", e.message);
+      return;
     }
 
-    // 2. Verify the HMAC-SHA256 signature over the RAW body.
-    const sig = req.get("x-webhook-signature-256") || "";
-    const expected =
-      "sha256=" +
-      crypto
-        .createHmac("sha256", TOGGL_WEBHOOK_SECRET.value())
-        .update(req.rawBody)
-        .digest("hex");
-    const ok =
-      sig.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
-    if (!ok) return res.status(403).send("bad signature");
+    if (resp.status === 429) {
+      console.warn("toggl rate limited (429) — skipping this poll");
+      return;
+    }
 
-    // 3. The subscription already filters to time_entry created/updated, so no
-    //    entity re-check here (Toggl names it `model` in the payload, not
-    //    `entity`). Just skip deletes.
-    const meta = body.metadata || {};
-    console.log("event", JSON.stringify({ model: meta.model, action: meta.action,
-      entryId: body.payload && body.payload.id, stop: body.payload && body.payload.stop,
-      duration: body.payload && body.payload.duration }));
-    if (meta.action === "deleted") return res.status(200).send("ignored");
-
-    const entry = body.payload || {};
-    // Toggl marks a running entry with stop=null and a negative duration.
-    const togglRunning = entry.stop == null && Number(entry.duration) < 0;
-    const now = Date.now();
+    let runningId = null;
+    let runningType = null;
+    if (resp.status === 200) {
+      const entry = await resp.json().catch(() => null);
+      if (entry && entry.id != null) {
+        runningId = entry.id;
+        runningType = entry.type;
+      }
+    } else if (resp.status === 204) {
+      runningId = null; // not tracking anything
+    } else {
+      const txt = await resp.text().catch(() => "");
+      console.error("toggl tracking/current:", resp.status, txt.slice(0, 200));
+      return;
+    }
 
     const snap = await timerRef().get();
     const d = snap.exists ? snap.data() : {};
+    const lastId = d.togglEntryId != null ? d.togglEntryId : null;
+    const now = Date.now();
     const workMins = Number(d.workMins) || 25;
     const breakMins = Number(d.breakMins) || 5;
 
-    if (togglRunning) {
-      // STARTED -> work. Ignore mere edits while already working.
-      if (d.running === true && d.phase === "work" && d.togglEntryId === entry.id) {
-        return res.status(200).send("already working");
-      }
+    if (runningId != null && String(runningId) !== String(lastId)) {
+      // A (new) timer is running in Toggl -> Pomodoro work.
       const update = {
         running: true,
         phase: "work",
         endsAt: now + workMins * 60 * 1000,
-        togglEntryId: entry.id,
+        togglEntryId: runningId,
       };
-      // Coming off a break -> start a fresh "work since last break" window.
       if (d.phase === "break") update.workedSinceBreak = 0;
       await timerRef().set(update, { merge: true });
-      console.log("-> pomodoro WORK started (endsAt in", workMins, "min)");
-      return res.status(200).send("work started");
+      console.log("-> WORK started (toggl entry", runningId, "type", runningType, ")");
+    } else if (runningId == null && lastId != null) {
+      // Toggl timer stopped -> Pomodoro break.
+      await timerRef().set(
+        {
+          running: true,
+          phase: "break",
+          endsAt: now + breakMins * 60 * 1000,
+          togglEntryId: null,
+        },
+        { merge: true }
+      );
+      console.log("-> BREAK started (toggl stopped)");
+    } else {
+      console.log("no change (runningId", runningId, "lastId", lastId, ")");
     }
-
-    // STOPPED -> break, but only for the entry we started (avoid reacting to
-    // edits of older, already-stopped entries).
-    if (entry.id !== d.togglEntryId) {
-      console.log("-> ignored stop (not the active entry; active=", d.togglEntryId, ")");
-      return res.status(200).send("not the active entry");
-    }
-    console.log("-> pomodoro BREAK started (endsAt in", breakMins, "min)");
-    await timerRef().set(
-      {
-        running: true,
-        phase: "break",
-        endsAt: now + breakMins * 60 * 1000,
-        togglEntryId: null,
-      },
-      { merge: true }
-    );
-    return res.status(200).send("break started");
   }
 );
