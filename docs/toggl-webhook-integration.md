@@ -15,6 +15,32 @@ Toggl Track  --(webhook POST on event)-->  Cloud Function (HTTPS)
                                             web  +  mobile
 ```
 
+## Status — WDROŻONE i działa (2026-10-28)
+
+Faktyczna implementacja jest w `functions/index.js` (reszta tego dokumentu to
+pierwotny plan/referencja). Co jest na produkcji:
+
+- **Funkcja:** `togglWebhook` (Gen2, region `europe-west1`, Node 22,
+  `maxInstances: 2`). URL: `https://europe-west1-pomodoro-d9a43.cloudfunctions.net/togglWebhook`.
+- **Sekret:** `TOGGL_WEBHOOK_SECRET` w Secret Manager (HMAC), ten sam na subskrypcji.
+- **Subskrypcja Track:** `subscription_id 131101`, workspace `6711899`,
+  filtry `time_entry` × (`created`, `updated`), `validated`.
+- **Mapowanie:** Toggl start (wpis trwający: `stop=null`, `duration<0`) → Pomodoro
+  **praca**; Toggl stop (`updated` z ustawionym `stop`) → Pomodoro **przerwa**.
+  Śledzimy `togglEntryId`, żeby edycje starych wpisów nie wywoływały fałszywej przerwy.
+
+**Kluczowe wnioski (łatwo się potknąć):**
+- **Konto jest na Toggl 2.0 (Focus), nie Track.** Webhooki są tylko w **Track v9**
+  (`api.track.toggl.com`). Żeby aktywność z 2.0 trafiała do Track i wyzwalała
+  webhook, trzeba mieć włączony **Live Sync 2.0 → Track**.
+- **Dwa różne tokeny:** do utworzenia/zarządzania subskrypcją Track używa się
+  **tokenu Track v9** (Basic auth `token:api_token`). Nowy token `toggl_sk_`
+  (Bearer, API 2.0 `focus.toggl.com`) jest **odrzucany** przez v9.
+- **Payload webhooka ma `metadata.model`** (= `"time_entry"`), **NIE `metadata.entity`**
+  (tak nazywa się tylko pole filtra w subskrypcji). Nie dodawać z powrotem
+  warunku `if (meta.entity !== "time_entry")` — odrzuci wszystko.
+- **Trzymać `auto` OFF** w Pomodoro, inaczej przerwa auto-przeskoczy z powrotem na pracę.
+
 ## Warunki wstępne
 - Plan **Blaze** (pay-as-you-go) w Firebase — wymagany do deployu funkcji.
   W praktyce koszt ~0 zł (ruch mieści się w darmowym progu), ale trzeba podpiąć
